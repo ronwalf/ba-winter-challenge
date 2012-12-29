@@ -25,7 +25,7 @@ import Data.Typeable
 import Prelude as P
 import Text.Blaze.Html5 hiding (map, head)
 --import qualified Text.Blaze.Html5 as H
-import Text.Blaze.Html5.Attributes hiding (title, rows, accept, name)
+import Text.Blaze.Html5.Attributes hiding (title, rows, accept, name, id)
 --import qualified Text.Blaze.Html5.Attributes as A
 
 import Strava (RideDetails(..))
@@ -55,9 +55,9 @@ instance Ord UserScore where
 addScore :: UserScore -> RideDetails -> UserScore
 addScore score ride
     | currentDay score /= utctDay (rideStart ride)
-        = updateDays $ addMileage $ score { currentDay = utctDay $ rideStart ride, currentMiles = 0 }
+        = addDay $ addMileage $ score { currentDay = utctDay $ rideStart ride, currentMiles = 0 }
     | otherwise
-        = updateDays $ addMileage $ score
+        = (if (currentMiles score < 1) then addDay else id) $ addMileage $ score
     where
     addMileage :: UserScore -> UserScore
     addMileage s = s { 
@@ -65,10 +65,8 @@ addScore score ride
         miles = miles s + rideMiles ride, 
         currentMiles = currentMiles s + rideMiles ride,
         currentRide = if (rideID ride > currentRide s) then rideID ride else currentRide s }
-    updateDays score' =
-        if (currentMiles score < 1 && currentMiles score' > 1)
-            then score' { days = days score' + 1 }
-            else score'
+    addDay :: UserScore -> UserScore
+    addDay s = if (currentMiles s >= 1) then s { days = days s + 1 } else s
 
 
 data GroupScore = GroupScore {
