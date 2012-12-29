@@ -39,6 +39,7 @@ rideSearch opts manager = do
                 fmap (renderNum "athleteId") $ userID opts,
                 fmap (renderDay "startDate") $ startDay opts,
                 fmap (renderDay "endDate") $ endDay opts,
+                fmap (renderNum "startId") $ startId opts,
                 if (offset > 0) then Just (renderNum "offset" offset) else Nothing
                 ])
         let glLen = length gl
@@ -54,10 +55,11 @@ data RSOpts = RSOpts {
     userID :: Maybe Integer,
     clubID :: Maybe Integer,
     startDay :: Maybe Day,
-    endDay :: Maybe Day
+    endDay :: Maybe Day,
+    startId :: Maybe Integer
 }
 rsDefault :: RSOpts
-rsDefault = RSOpts Nothing Nothing Nothing Nothing
+rsDefault = RSOpts Nothing Nothing Nothing Nothing Nothing
 
 
 rideDetails :: (Failure HttpException m, MonadBaseControl IO m, MonadResource m) => Integer -> Manager -> m ((T.Text, T.Text), RideDetails)

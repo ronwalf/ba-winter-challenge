@@ -1,16 +1,32 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveDataTypeable, OverloadedStrings #-}
 module Scoring (
   UserScore(..), 
   emptyScore,
   userScore,
-  addScore
+  addScore,
+
+  GroupScore(..),
+  scoreGroup,
+  groupScore,
+
+  renderGroups,
+  renderScores
 ) where
 
+import Data.Data (Data)
 import Data.Function (on)
+import Data.List (sort)
+import qualified Data.Map as M
+import Data.Maybe (mapMaybe)
 import qualified Data.Text as T
 import Data.Time.Calendar (Day, fromGregorian)
 import Data.Time.Clock (utctDay)
-
+import Data.Typeable
+import Prelude as P
+import Text.Blaze.Html5 hiding (map, head)
+--import qualified Text.Blaze.Html5 as H
+import Text.Blaze.Html5.Attributes hiding (title, rows, accept, name)
+--import qualified Text.Blaze.Html5.Attributes as A
 
 import Strava (RideDetails(..))
 
@@ -26,10 +42,10 @@ data UserScore = UserScore {
     currentDay :: !Day,
     currentMiles :: !Double,
     currentRide :: !Integer
-} deriving (Eq, Show)
+} deriving (Data, Eq, Show, Typeable)
 
 emptyScore :: Integer -> T.Text -> UserScore
-emptyScore uid n = UserScore uid n 0 0 0 (fromGregorian 0 0 0) 0 0
+emptyScore myuid n = UserScore myuid n 0 0 0 (fromGregorian 0 0 0) 0 0
 userScore :: UserScore -> Int
 userScore score = 10 * days score + floor (miles score)
 
@@ -53,3 +69,59 @@ addScore score ride
         if (currentMiles score < 1 && currentMiles score' > 1)
             then score' { days = days score' + 1 }
             else score'
+
+
+data GroupScore = GroupScore {
+    gid :: Integer,
+    gname :: T.Text,
+    gscores :: [UserScore]
+} deriving (Data, Eq, Typeable)
+groupScore :: GroupScore -> Int
+groupScore = sum . P.map userScore . gscores
+
+instance Ord GroupScore where
+    compare = compare `on` (\g -> (groupScore g, gid g))
+
+scoreGroup :: M.Map Integer UserScore -> ((T.Text, Integer), [(T.Text, Integer)]) -> GroupScore
+scoreGroup scoreMap ((myname, gid'), members) = GroupScore gid' myname $
+    mapMaybe (flip M.lookup scoreMap . snd) members
+
+
+renderScores :: [UserScore] -> Html
+{-
+renderScores scores = table $ do
+    tr $ do
+        th ""
+        th "Name"
+        th "Points"
+    mapM_ row $ zip [1..] $ reverse $ sort scores
+    where
+    row :: (Int, UserScore) -> Html
+    row (points, us) = tr $ do
+        td $ do
+            toHtml points
+            ": "
+        td $ a ! href (toValue $ "http://app.strava.com/athletes/" ++ (show $ uid us)) $ toHtml $ name us
+        td $ toHtml $ userScore us
+-}
+renderScores scores = ol $ do
+    mapM_ row $ reverse $ sort scores
+    where
+    row us = li $ do
+        a ! href (toValue $ "http://app.strava.com/athletes/" ++ (show $ uid us)) $ toHtml $ name us
+        _ <- ": "
+        td $ toHtml $ userScore us
+        " points"
+
+
+renderGroups :: [GroupScore] -> Html
+renderGroups groups = ol $ mapM_ groupHtml $ reverse $ sort groups
+    where
+    groupHtml :: GroupScore -> Html
+    groupHtml gs = li $ do
+        a ! href (toValue $ "http://app.strava.com/clubs/" ++ (show $ gid gs)) $ toHtml $ gname gs
+        _ <- ": "
+        toHtml (groupScore gs)
+        _ <- " points"
+        renderScores (gscores gs)
+

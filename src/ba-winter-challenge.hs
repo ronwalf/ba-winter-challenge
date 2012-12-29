@@ -1,62 +1,90 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
+{-# LANGUAGE DeriveDataTypeable, FlexibleContexts, OverloadedStrings #-}
 module Main where
 
 import Control.Applicative ((<$>), (<*>))
 import Control.Failure (Failure)
-import Control.Monad (liftM)
+import Control.Monad (liftM, when)
 import Data.Aeson
+import qualified Data.Aeson.Generic as AG
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as B
 import Data.Conduit (MonadBaseControl, MonadResource)
+import Data.Data (Data)
 import Data.Function (on)
-import qualified Data.Map as M
-import Data.Maybe (mapMaybe)
 import Data.List (foldl', nub, sort, sortBy)
+import qualified Data.Map as M
+--import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
-import Data.Time.Calendar (Day, fromGregorian)
---import Data.Time.Clock (UTCTime, utctDay)
-import Data.Time.Format (parseTime)
+import Data.Time.Calendar (Day)
+import Data.Time.LocalTime (ZonedTime, getZonedTime)
+import Data.Time.Format (parseTime, formatTime)
+import Data.Typeable (Typeable)
 import Network (withSocketsDo)
 import Network.HTTP.Conduit (withManager, Manager, HttpException)
 import System.Console.GetOpt
+import System.Directory (createDirectory, doesDirectoryExist)
 import System.Environment (getArgs)
+import System.FilePath (combine)
 import System.Locale (defaultTimeLocale)
+import Text.Blaze.Html.Renderer.Utf8
+import Text.Blaze.Html5 hiding (map, head)
+import qualified Text.Blaze.Html5 as H
+import Text.Blaze.Html5.Attributes hiding (title, rows, accept, name, dir, start)
+--import qualified Text.Blaze.Html5.Attributes as A
 
 
 import qualified Scoring as S
 import Strava
 
+main :: IO ()
 main = withSocketsDo $ do
     argv <- getArgs
     (opts, config) <- case getOpt Permute options argv of
         (o, [cfname], []) -> do
             cf <- B.readFile cfname
             case decode' cf of
-                Just c -> return (o, c)
+                Just c -> return (foldl' (\opts f -> f opts) defaultOpts o, c)
                 Nothing -> fail "Could not parse config file"
         (_, _, errs) ->
             ioError $ userError $
             concat errs ++ usageInfo "Usage: ba-winter-challenge [OPTION..] config-file" options
+    loadedScores <- if (clearCache opts)
+        then return M.empty
+        else loadScores config
     (groups, rides) <- withManager $ \manager -> do
         groups <- mapM (flip groupMembers manager) $ (challengeGroups config ++ challengeOthers config)
         let members = nub $ sortBy (compare `on` snd) $ concatMap snd groups
-        rides <- mapM (\m@(_, uid) -> liftM (\x -> (m, x)) $ userRides uid (challengeStart config) (challengeEnd config) manager) members
+        rides <- mapM (\m@(_, uid) -> liftM (\x -> (m, x)) $ userRides uid (challengeStart config) (challengeEnd config) (1 + (maybe 0 S.currentRide $ M.lookup uid loadedScores)) manager) members
         return (filter (flip elem (challengeGroups config) . snd . fst) groups, rides)
-    putStrLn "Collating..."
-    let loadedScores = M.empty
+    -- putStrLn "Collating..."
+    ensureDirectory (challengeDir config)
     let scoreMap = foldl' addRides loadedScores rides
-    let groupScores = sort $ map (scoreGroup scoreMap) groups
+    saveScores config scoreMap
+    let groupScores = sort $ map (S.scoreGroup scoreMap) groups
     let userScores = sort $ map snd $ M.toList scoreMap
-    putStrLn "Group Scores:"
-    mapM_ (\g -> print (gname g, groupScore g)) groupScores
-    putStrLn "User Scores:"
-    mapM_ (\u -> print (S.name u, S.userScore u)) userScores
+    -- putStrLn "Group Scores:"
+    -- mapM_ (\g -> print (S.gname g, S.groupScore g)) groupScores
+    -- putStrLn "User Scores:"
+    -- mapM_ (\u -> print (S.name u, S.userScore u)) userScores
+    ztime <- getZonedTime
+    B.writeFile (combine (challengeDir config) "index.html") $ renderHtml $ render config ztime userScores groupScores
     return ()
     where
     addRides :: M.Map Integer S.UserScore -> ((T.Text, Integer), [RideDetails]) -> M.Map Integer S.UserScore
     addRides scoreMap ((name, uid), rides) = score `seq` M.insert uid score scoreMap
         where
         score = foldl' S.addScore (M.findWithDefault (S.emptyScore uid name) uid scoreMap) rides
-
+    ensureDirectory :: String -> IO ()
+    ensureDirectory dir = do
+        exists <- doesDirectoryExist dir
+        when (not exists) $ do
+            createDirectory dir
+        return ()
+    loadScores :: ChallengeConfig -> IO (M.Map Integer S.UserScore)
+    loadScores config = do
+        scoreFile <- BS.readFile (combine (challengeDir config) "scores.json")
+        return $ maybe M.empty toScoreMap $ AG.decode' $ B.pack $ BS.unpack $ scoreFile
+    saveScores config scoreMap = B.writeFile (combine (challengeDir config) "scores.json") $ AG.encode $ fromScoreMap scoreMap
 data Options = Options { clearCache :: Bool }
 defaultOpts :: Options
 defaultOpts = Options { clearCache = False }
@@ -70,6 +98,7 @@ options =
 
 
 data ChallengeConfig = ChallengeConfig {
+    challengeTitle :: T.Text,
     challengeDir :: String,
     challengeGroups :: [Integer],
     challengeOthers :: [Integer],
@@ -77,8 +106,16 @@ data ChallengeConfig = ChallengeConfig {
     challengeEnd :: Day 
 } deriving Show
 
+data ScoreFile = ScoreFile [S.UserScore] deriving (Data, Typeable)
+fromScoreMap :: M.Map Integer S.UserScore -> ScoreFile
+fromScoreMap = ScoreFile . map snd . M.toList
+toScoreMap :: ScoreFile -> M.Map Integer S.UserScore
+toScoreMap (ScoreFile scores) = M.fromList $ map (\score -> (S.uid score, score)) scores
+
+
 instance FromJSON ChallengeConfig where
     parseJSON (Object v) = ChallengeConfig <$>
+        v .: "title" <*>
         v .: "directory" <*>
         v .: "groups" <*>
         v .: "others" <*>
@@ -92,27 +129,25 @@ instance FromJSON Day where
         _ -> fail "could not parse day"
     parseJSON _ = fail "Expecting string when parsing a Day"
 
-userRides :: (Failure HttpException m, MonadBaseControl IO m, MonadResource m) => Integer -> Day -> Day -> Manager -> m [RideDetails]
-userRides uid start end manager = do
-    urides <- rideSearch (rsDefault { userID = Just uid, startDay = Just start, endDay = Just end }) manager
+userRides :: (Failure HttpException m, MonadBaseControl IO m, MonadResource m) => Integer -> Day -> Day -> Integer -> Manager -> m [RideDetails]
+userRides uid start end sid manager = do
+    urides <- rideSearch (rsDefault { userID = Just uid, startDay = Just start, endDay = Just end, startId = Just sid }) manager
     liftM sort $ mapM (liftM snd . (flip rideDetails manager) . snd) urides
 
 
-data GroupScore = GroupScore {
-    gid :: Integer,
-    gname :: T.Text,
-    gscores :: [S.UserScore]
-} deriving Eq
-groupScore :: GroupScore -> Int
-groupScore = sum . map S.userScore . gscores
-
-instance Ord GroupScore where
-    compare = compare `on` (\g -> (groupScore g, gid g))
-
-scoreGroup :: M.Map Integer S.UserScore -> ((T.Text, Integer), [(T.Text, Integer)]) -> GroupScore
-scoreGroup scoreMap ((name, gid'), members) = GroupScore gid' name $
-    mapMaybe (flip M.lookup scoreMap . snd) members
-
-
-
-
+render :: ChallengeConfig -> ZonedTime -> [S.UserScore] -> [S.GroupScore] -> Html
+render config ztime userScores groupScores = docTypeHtml $ do
+    H.head $ do
+        title (toHtml $ challengeTitle config)
+        link ! rel "stylesheet" ! href "style.css" ! type_ "text/css"
+    body $ do
+        h1 (toHtml $ challengeTitle config)
+        h2 "Group Scores"
+        S.renderGroups groupScores
+        h2 "Individual Scores"
+        S.renderScores userScores
+        p $ do
+            _ <- "Last update at "
+            toHtml $ formatTime defaultTimeLocale "%T on %D" ztime
+        p $ a ! href "https://github.com/ronwalf/ba-winter-challenge" $ "Get the BA-Winter Challenge Code!"
+            
