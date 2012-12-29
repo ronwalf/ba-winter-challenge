@@ -4,6 +4,7 @@ The BA-Winter-Challenge code was created to power the
 [Bike Arlington Freezing Saddles Winter Bike Challenge](http://bikearlingtonforum.com/showthread.php?3500-Freezing-Saddles-Winter-Bike-Challenge-(sign-up-open\)).
 Given a list of Strava clubs, this program creates a competition scoreboard ala the [National Bike Challenge](http://nationalbikechallenge.org/) rules.
 
+The competition results are being posted [here](/Users/ronwalf/src/ba-winter-challenge/html/).
 
 ## Requirements and installation.
 BA-Winter-Challenge requires a recent copy of [Haskell](http://hackage.haskell.org/platform/), being most recently tested on Haskell Platform 2012.2.0.0, as well as a number of other libraries that are managed via [Cabal](http://www.haskell.org/cabal/).
