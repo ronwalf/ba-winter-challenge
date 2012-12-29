@@ -1,7 +1,7 @@
 # ba-winter-challenge
 
 The BA-Winter-Challenge code was created to power the 
-[Bike Arlington Freezing Saddles Winter Bike Challenge](http://bikearlingtonforum.com/showthread.php?3500-Freezing-Saddles-Winter-Bike-Challenge-(sign-up-open)).
+[Bike Arlington Freezing Saddles Winter Bike Challenge](http://bikearlingtonforum.com/showthread.php?3500-Freezing-Saddles-Winter-Bike-Challenge-(sign-up-open\)).
 Given a list of Strava clubs, this program creates a competition scoreboard ala the [National Bike Challenge](http://nationalbikechallenge.org/) rules.
 
 
