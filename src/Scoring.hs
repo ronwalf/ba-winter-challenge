@@ -64,7 +64,7 @@ addScore score ride
         rides = rides s + 1, 
         miles = miles s + rideMiles ride, 
         currentMiles = currentMiles s + rideMiles ride,
-        currentRide = rideID ride}
+        currentRide = if (rideID ride > currentRide s) then rideID ride else currentRide s }
     updateDays score' =
         if (currentMiles score < 1 && currentMiles score' > 1)
             then score' { days = days score' + 1 }
