@@ -30,7 +30,7 @@ executable ba-winter-challenge
         failure == 0.2.*,
         filepath == 1.*,
         http-conduit == 1.8.*,
-        network == 2.3.*,
+        network >= 2.3 && < 2.5,
         old-locale == 1.*,
         regex-posix >= 0.93 && < 1.0,
         text == 0.11.*,
