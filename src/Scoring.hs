@@ -109,7 +109,11 @@ renderScores scores = ol $ do
         a ! href (toValue $ "http://app.strava.com/athletes/" ++ (show $ uid us)) $ toHtml $ name us
         _ <- ": "
         td $ toHtml $ userScore us
-        " points"
+        _ <- " points ("
+        toHtml (days us)
+        _ <- " days, "
+        toHtml (floor $ miles us :: Int)
+        " miles)"
 
 
 renderGroups :: [GroupScore] -> Html
