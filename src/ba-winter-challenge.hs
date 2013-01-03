@@ -54,7 +54,7 @@ main = withSocketsDo $ do
     (groups, rides) <- withManager $ \manager -> do
         groups <- mapM (flip groupMembers manager) $ (challengeGroups config ++ challengeOthers config)
         let members = nub $ sortBy (compare `on` snd) $ concatMap snd groups
-        rides <- mapM (\m@(_, uid) -> liftM (\x -> (m, x)) $ userRides uid (challengeStart config) (challengeEnd config) (1 + (maybe 0 S.currentRide $ M.lookup uid loadedScores)) manager) members
+        rides <- mapM (\m@(_, uid) -> liftM (\x -> (m, filter (rideFilters config) x)) $ userRides uid (challengeStart config) (challengeEnd config) (1 + (maybe 0 S.currentRide $ M.lookup uid loadedScores)) manager) members
         return (filter (flip elem (challengeGroups config) . snd . fst) groups, rides)
     -- putStrLn "Collating..."
     ensureDirectory (challengeDir config)
@@ -85,6 +85,9 @@ main = withSocketsDo $ do
         scoreFile <- BS.readFile (combine (challengeDir config) "scores.json")
         return $ maybe M.empty toScoreMap $ AG.decode' $ B.pack $ BS.unpack $ scoreFile
     saveScores config scoreMap = B.writeFile (combine (challengeDir config) "scores.json") $ AG.encode $ fromScoreMap scoreMap
+    rideFilters :: ChallengeConfig -> RideDetails -> Bool
+    rideFilters config = not . or . flip map (map T.toCaseFold $ challengeFilters config) . (\r -> flip T.isInfixOf (T.toCaseFold (rideName r)))
+
 data Options = Options { clearCache :: Bool }
 defaultOpts :: Options
 defaultOpts = Options { clearCache = False }
@@ -97,15 +100,6 @@ options =
     ]
 
 
-data ChallengeConfig = ChallengeConfig {
-    challengeTitle :: T.Text,
-    challengeDir :: String,
-    challengeGroups :: [Integer],
-    challengeOthers :: [Integer],
-    challengeStart :: Day,
-    challengeEnd :: Day 
-} deriving Show
-
 data ScoreFile = ScoreFile [S.UserScore] deriving (Data, Typeable)
 fromScoreMap :: M.Map Integer S.UserScore -> ScoreFile
 fromScoreMap = ScoreFile . map snd . M.toList
@@ -113,10 +107,24 @@ toScoreMap :: ScoreFile -> M.Map Integer S.UserScore
 toScoreMap (ScoreFile scores) = M.fromList $ map (\score -> (S.uid score, score)) scores
 
 
+data ChallengeConfig = ChallengeConfig {
+    challengeTitle :: T.Text,
+    challengeDesc :: T.Text,
+    challengeDir :: String,
+    challengeFilters :: [T.Text],
+    challengeGroups :: [Integer],
+    challengeOthers :: [Integer],
+    challengeStart :: Day,
+    challengeEnd :: Day 
+} deriving Show
+
+
 instance FromJSON ChallengeConfig where
     parseJSON (Object v) = ChallengeConfig <$>
         v .: "title" <*>
+        v .: "desc" <*>
         v .: "directory" <*>
+        v .: "filters" <*>
         v .: "groups" <*>
         v .: "others" <*>
         v .: "start" <*>
@@ -142,6 +150,7 @@ render config ztime userScores groupScores = docTypeHtml $ do
         link ! rel "stylesheet" ! href "style.css" ! type_ "text/css"
     body $ do
         h1 (toHtml $ challengeTitle config)
+        preEscapedToHtml $ challengeDesc config
         h2 "Group Scores"
         S.renderGroups groupScores
         h2 "Individual Scores"

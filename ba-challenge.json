@@ -1,5 +1,7 @@
 {
     "title" : "BikeArlington Freezing Saddles Competition",
+    "desc" : "<p>Here's the scoreboard for the <a href='http://bikearlingtonforum.com/showthread.php?3500-Freezing-Saddles-Winter-Bike-Challenge-(sign-up-open)'>BA Winter Bike Challenge</a>.  Please remember to put \"#NoBAFS\" on any of your activities which are not outdoor bike rides!</p>",
+    "filters" : ["#NoBAFS"],
     "directory" : "html",
     "authtoken" : "",
     "groups" : [
@@ -15,7 +17,7 @@
         8189 
      ],
     "others" : [8123],
-    "start" : "2012-11-01",
-    "end" : "2012-12-31"
+    "start" : "2013-01-01",
+    "end" : "2013-03-20"
 }
 
