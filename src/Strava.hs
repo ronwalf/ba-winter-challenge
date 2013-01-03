@@ -9,7 +9,6 @@ import Control.Applicative ((<$>), (<*>))
 import Control.Failure (Failure)
 import Control.Monad (liftM)
 import Data.Aeson
-import qualified Data.ByteString.Lazy as B
 import Data.Conduit (MonadBaseControl, MonadResource)
 import Data.Function (on)
 import Data.List (intercalate)
@@ -65,13 +64,6 @@ rsDefault = RSOpts Nothing Nothing Nothing Nothing Nothing
 rideDetails :: (Failure HttpException m, MonadBaseControl IO m, MonadResource m) => Integer -> Manager -> m ((T.Text, T.Text), RideDetails)
 rideDetails rid manager = getJSON ("http://app.strava.com/api/v2/rides/" ++ (show rid)) manager
 
-{-
-getRequest_ :: String -> Request B.ByteString
-getRequest_ urlString = do
-  case parseURI urlString of
-    Nothing -> error ("getRequest: Not a valid URL - " ++ urlString)
-    Just u  -> mkRequest GET u
--}
 
 getJSON :: (FromJSON a, Failure HttpException m, MonadBaseControl IO m, MonadResource m) => String -> Manager -> m a
 getJSON urlString manager = do
