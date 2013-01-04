@@ -155,6 +155,17 @@ render config ztime userScores groupScores = docTypeHtml $ do
         S.renderGroups groupScores
         h2 "Individual Scores"
         S.renderScores userScores
+        h2 "Total Stats"
+        ul $ do
+            li $ do
+                toHtml $ sum $ map S.rides userScores
+                " rides"
+            li $ do
+                toHtml $ (floor :: Double -> Int) $ sum $ map S.miles userScores
+                " miles"
+            li $ do
+                toHtml $ sum $ map S.userScore userScores
+                " total points earned"
         p $ do
             _ <- "Last update at "
             toHtml $ formatTime defaultTimeLocale "%T on %D" ztime

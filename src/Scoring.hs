@@ -124,6 +124,8 @@ renderGroups groups = ol $ mapM_ groupHtml $ reverse $ sort groups
         a ! href (toValue $ "http://app.strava.com/clubs/" ++ (show $ gid gs)) $ toHtml $ gname gs
         _ <- ": "
         toHtml (groupScore gs)
-        _ <- " points"
+        _ <- " points ("
+        toHtml (sum $ map miles $ gscores gs)
+        _ <- ") "
         renderScores (gscores gs)
 
