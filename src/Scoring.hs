@@ -126,6 +126,6 @@ renderGroups groups = ol $ mapM_ groupHtml $ reverse $ sort groups
         toHtml (groupScore gs)
         _ <- " points ("
         toHtml ((floor :: Double -> Int) $ sum $ map miles $ gscores gs)
-        _ <- ") "
+        _ <- " miles) "
         renderScores (gscores gs)
 
