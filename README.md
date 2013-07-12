@@ -1,4 +1,5 @@
-# ba-winter-challenge
+# ba-winter-challenge (deprecated)
+This code no longer works, as Strava removed API access for most third parties.  Suggestions for a new backend are welcome!
 
 The BA-Winter-Challenge code was created to power the 
 [Bike Arlington Freezing Saddles Winter Bike Challenge](http://bikearlingtonforum.com/showthread.php?3500-Freezing-Saddles-Winter-Bike-Challenge-(sign-up-open\)).
